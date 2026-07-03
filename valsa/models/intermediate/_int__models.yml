@@ -266,49 +266,64 @@ models:
         description: "Data de fim da vigência do plano"
   - name: fato_programas
     description: >
-      Fato de episódios de cuidado (vínculo paciente-programa de saúde).
-      Aplica três camadas de tratamento: normalização do nome do programa
-      (corrige inconsistência de capitalização na fonte), "mais novo ganha"
-      por episode_of_care_id, e deduplicação por chave de negócio
-      (paciente + programa + data de admissão) para corrigir um bug
-      conhecido da Prontlife que gera múltiplos episode_of_care_id para
-      o mesmo vínculo lógico.
+      Fato de episódios de programa (admissão/inativação) dos pacientes na Valsa,
+      deduplicado por episódio (mais novo ganha por delivery_date) e por regra de
+      negócio (paciente + programa + período, evitando reabertura indevida quando
+      já havia um episódio ativo anterior sem inativação).
     columns:
       - name: id_episodio
-        description: "Identificador único do episódio de cuidado (chave primária do fato)"
+        description: Chave do episódio de programa (episode_of_care_id).
         tests:
           - unique
           - not_null
 
       - name: id_paciente
-        description: "Referência ao paciente (dim_pacientes)"
+        description: Identificador do paciente.
+        tests:
+          - not_null
 
       - name: nome_programa
-        description: "Nome do programa de saúde, normalizado (capitalização padronizada)"
+        description: Nome do programa (categoria do episódio), capitalizado.
+        tests:
+          - not_null
 
       - name: id_gestor
-        description: "Referência ao profissional gestor do caso (dim_profissionais)"
+        description: Identificador do profissional gestor do caso.
 
       - name: nome_gestor
-        description: "Nome do gestor do caso"
+        description: Nome do profissional gestor do caso.
 
       - name: papel_gestor
-        description: "Papel/função do gestor (ex: Gestor de Enfermagem)"
+        description: Papel/função do gestor do caso.
 
-      - name: status
-        description: "Status do episódio, traduzido para português (Ativo/Inativo)"
+      - name: status_paciente
+        description: Status do episódio traduzido para português (Ativo/Inativo).
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Ativo', 'Inativo']
 
       - name: data_admissao
-        description: "Data de admissão do paciente no programa, no horário de Brasília"
+        description: Data de admissão do paciente no programa (period_start), fuso America/Sao_Paulo.
+        tests:
+          - not_null
 
       - name: data_fim_prevista
-        description: "Data de fim prevista do acompanhamento, no horário de Brasília"
+        description: Data prevista de encerramento do episódio (period_end), fuso America/Sao_Paulo.
 
       - name: data_inativacao
-        description: "Data e hora em que o episódio foi efetivamente inativado, no horário de Brasília"
+        description: Data efetiva de inativação do episódio, fuso America/Sao_Paulo. Nula enquanto o episódio está ativo.
+
+      - name: data_entrega
+        description: >
+          Data de entrega do registro pela Prontlife (delivery_date). Usada para determinar
+          qual episódio é o mais recente/confiável quando um paciente tem episódios
+          sobrepostos ou conflitantes (mesma lógica de "mais novo ganha" aplicada em outros modelos).
+        tests:
+          - not_null
 
       - name: observacao
-        description: "Observações registradas sobre o episódio"
+        description: Observação livre registrada no episódio (note).
   - name: fato_diagnosticos
     description: >
       Fato de diagnósticos registrados no contexto de um atendimento.

@@ -103,6 +103,9 @@ final as (
         (period_end at time zone 'America/Sao_Paulo')::timestamp            as data_fim_prevista,
         (inactivation_datetime at time zone 'America/Sao_Paulo')::timestamp as data_inativacao,
 
+        -- metadado de origem (data em que esse registro foi entregue pela Prontlife)
+        delivery_date                                                       as data_entrega,
+
         -- observação
         note                                                                as observacao
 
