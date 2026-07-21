@@ -18,8 +18,10 @@ logger = logging.getLogger(__name__)
 PASTAS_IGNORADAS = {"20250214"}
 
 # Configurações vindas do .env
-AWS_ACCESS_KEY = os.environ["AWS_ACCESS_KEY"]
-AWS_SECRET_KEY = os.environ["AWS_SECRET_KEY"]
+# AWS_ACCESS_KEY / AWS_SECRET_KEY não são mais usadas: em produção (ECS) as
+# credenciais vêm automaticamente da task role (etl-role-ecs). Para rodar
+# localmente, configure suas credenciais via `aws configure` ou variáveis
+# padrão AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, que o boto3 detecta sozinho.
 S3_BUCKET = os.environ["S3_BUCKET_NAME"]
 S3_PREFIX = "prontlife/"
 
@@ -36,13 +38,13 @@ RAW_SCHEMA = "prontlife_raw"
 
 
 def conectar_s3():
-    """Cria e retorna um cliente S3 autenticado."""
+    """
+    Cria e retorna um cliente S3 autenticado.
+    Não passamos credenciais explícitas: o boto3 detecta automaticamente
+    a credencial disponível (task role no ECS, ou `aws configure` local).
+    """
     logger.info("Conectando ao S3...")
-    return boto3.client(
-        "s3",
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY,
-    )
+    return boto3.client("s3")
 
 
 def conectar_banco():
@@ -77,13 +79,13 @@ def listar_pastas_s3(s3):
 
 
 def listar_pastas_processadas(cursor):
-    """Retorna as delivery_dates que já estão na raw."""
+    """Retorna as delivery_dates que já estão na raw, no formato YYYYMMDD."""
     try:
         cursor.execute(f"""
             select distinct delivery_date::text
             from {RAW_SCHEMA}.patient
         """)
-        return {row[0] for row in cursor.fetchall()}
+        return {row[0].replace("-", "") for row in cursor.fetchall()}
     except Exception:
         cursor.connection.rollback()
         return set()
@@ -273,8 +275,9 @@ def main():
         pendentes = pastas_pendentes(s3, cursor)
 
         if not pendentes:
-            logger.info("Nenhuma pasta nova encontrada. Encerrando.")
-            return
+            mensagem = f"Nenhuma pasta nova encontrada em s3://{S3_BUCKET}/{S3_PREFIX}"
+            logger.warning(mensagem)
+            raise RuntimeError(mensagem)
 
         resumo = {}
 

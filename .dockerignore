@@ -1,0 +1,11 @@
+﻿valsa/target/
+valsa/dbt_packages/
+valsa/logs/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+Dockerfile
+.dockerignore
