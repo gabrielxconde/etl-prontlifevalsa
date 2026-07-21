@@ -254,13 +254,30 @@ models:
     description: >
       Mart que consolida os registros de vacinação provenientes do
       questionário VALSA - Visita Enfermagem Rotina. Cada linha representa
-      uma vacina registrada para um paciente, padronizando os nomes das
-      vacinas e preservando a data de administração, permitindo análises
-      temporais e acompanhamento da cobertura vacinal.
+      uma dose real de vacina administrada a um paciente, padronizando os
+      nomes das vacinas e preservando a data de administração, permitindo
+      análises temporais e acompanhamento da cobertura vacinal.
+
+      Deduplicação: a mesma dose pode ser reconfirmada em visitas
+      posteriores, gerando múltiplas submissões de questionário
+      (id_resposta) para a mesma vacina e data de administração. A mart
+      deduplica por (id_paciente, vacina, data_administracao), mantendo
+      apenas 1 linha por dose real e priorizando a submissão mais recente
+      (data_resposta) como representante. Por isso, id_resposta não é
+      único nesta tabela — ele identifica apenas qual submissão específica
+      "venceu" a deduplicação, não a dose em si.
+
+      Também cobre variações de texto usadas pelo Prontlife para a mesma
+      pergunta ao longo do tempo (ex.: "Quais:" e "Quais vacinas?"),
+      unificadas na mesma lógica de padronização.
 
     columns:
       - name: id_resposta
-        description: "Identificador da submissão do questionário."
+        description: >
+          Identificador da submissão do questionário que representa esta
+          dose após a deduplicação (a mais recente, quando há múltiplas
+          reconfirmações da mesma dose). Não é uma chave única da tabela —
+          a chave real é (id_paciente, vacina, data_administracao).
         tests:
           - not_null
 
@@ -306,7 +323,9 @@ models:
 
       - name: data_resposta
         description: >
-          Data e hora da submissão do questionário.
+          Data e hora da submissão do questionário que representa esta
+          dose após a deduplicação (a mais recente entre as reconfirmações,
+          quando aplicável).
 
         tests:
           - not_null
@@ -320,3 +339,10 @@ models:
           - accepted_values:
               values:
                 - "Concluído"
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - id_paciente
+            - vacina
+            - data_administracao

@@ -30,7 +30,8 @@ vacinas_raw as (
     where status = 'Concluído'
       and texto_pergunta in (
           'Vacinas em dia:',
-          'Quais vacinas?'
+          'Quais vacinas?',
+          'Quais:'
       )
       and nullif(trim(coalesce(resposta_escolha, resposta_codigo, resposta_texto)), '') is not null
 ),
@@ -46,8 +47,12 @@ vacinas_padronizadas as (
     from vacinas_raw
 ),
 final as (
+    -- Deduplicamos por paciente + vacina + data de administração, e não por
+    -- id_resposta: a mesma dose real pode ser reconfirmada em visitas
+    -- posteriores, gerando várias respostas de questionário diferentes para
+    -- a mesma vacina/data. Mantemos apenas 1 linha por dose real, priorizando
+    -- a resposta mais recente (data_resposta desc) como representante.
     select distinct on (
-        b.id_resposta,
         b.id_paciente,
         v.vacina,
         b.data_administracao
@@ -71,7 +76,6 @@ final as (
     )
     and b.data_administracao is not null
     order by
-        b.id_resposta,
         b.id_paciente,
         v.vacina,
         b.data_administracao,
